@@ -12,7 +12,7 @@ from statsmodels.stats.outliers_influence import variance_inflation_factor
 from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline
 
-from sklearn.linear_model import LinearRegression,Ridge,Lasso
+from sklearn.linear_model import LinearRegression,ElasticNet
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_squared_error, r2_score,mean_absolute_error
 import joblib
@@ -120,6 +120,48 @@ standard_scaler=StandardScaler()
 X_train[remaining_numeric]=standard_scaler.fit_transform(X_train[remaining_numeric])
 X_test[remaining_numeric]=standard_scaler.transform(X_test[remaining_numeric])
 
-print(X_train.shape,X_test.shape)
-print(X_train.select_dtypes('object').columns.tolist())
-print(X_train.isna().sum().sum(),X_test.isna().sum().sum())
+
+#TRAINING MODELS >>>>>>>>
+
+lr=LinearRegression()
+lr.fit(X_train,y_train)
+y_pred_lr=lr.predict(X_test)
+
+rmse=np.sqrt(mean_squared_error(y_test,y_pred_lr))
+r2=r2_score(y_test,y_pred_lr)
+
+
+en=ElasticNet(alpha=0.01,l1_ratio=0.5,random_state=20)
+en.fit(X_train,y_train)
+y_pred_en=en.predict(X_test)
+
+rmse_final=np.sqrt(mean_squared_error(y_test,y_pred_en))
+r2_final=r2_score(y_test,y_pred_en)
+
+rf=RandomForestRegressor(n_estimators=300,max_depth=20,min_samples_leaf=2,min_samples_split=5,random_state=20)
+rf.fit(X_train,y_train)
+y_pred_rf=rf.predict(X_test)
+
+rmse_best=np.sqrt(mean_squared_error(y_test,y_pred_rf))
+r2_best=r2_score(y_test,y_pred_rf)
+
+
+# param_grid = {
+#     'alpha': [0.0001, 0.0005, 0.001, 0.005,0.01],
+#     'l1_ratio': [0.1, 0.3, 0.5, 0.7, 0.9,1.0]
+# }
+# grid=GridSearchCV(estimator=ElasticNet(random_state=20), param_grid=param_grid, cv=5, n_jobs=-1, scoring='r2')
+# grid.fit(X_train, y_train)
+# print(f'Best parameters: {grid.best_params_}')
+# print(f'Best R2 score: {grid.best_score_}')
+
+# best_en=grid.best_estimator_
+# y_pred_best_en=best_en.predict(X_test)
+# rmse_best_en=np.sqrt(mean_squared_error(y_test,y_pred_best_en))
+# r2_best_en=r2_score(y_test,y_pred_best_en)
+# print(f'Best Elastic Net - RMSE: {rmse_best_en}, R2: {r2_best_en}')
+
+print(f"{'Model':<25}{'RMSE':<10}{'R2':<10}")
+print(f"{'Linear Regression':<25}{rmse:<10.4f}{r2:<10.4f}")
+print(f"{'Random Forest (tuned)':<25}{rmse_best:<10.4f}{r2_best:<10.4f}")
+print(f"{'ElasticNet (final)':<25}{rmse_final:<10.4f}{r2_final:<10.4f}")
