@@ -87,6 +87,11 @@ nominal_cols = ['MSZoning', 'Street', 'LotShape', 'LandContour', 'Utilities', 'L
 skewed_cols = ['LotArea', 'LotFrontage', 'MasVnrArea', 'TotalBsmtSF', '1stFlrSF', 'GrLivArea']
 extra_ordinal = ['BsmtExposure', 'BsmtFinType1', 'BsmtFinType2', 'GarageFinish']
 
+#JOBLIB>>>>>>>>>>>>>
+nominal_defaults=df[nominal_cols].mode().iloc[0].to_dict()
+joblib.dump(nominal_defaults,'nominal_defaults.pkl')
+#<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
 quality_order=['None','Po','Fa','TA','Gd','Ex']
 encoder=OrdinalEncoder(categories=[quality_order]*len(ordinal_cols))
 df[ordinal_cols]=encoder.fit_transform(df[ordinal_cols])
@@ -95,9 +100,6 @@ ohe = OneHotEncoder(drop='first', sparse_output=False, handle_unknown='ignore')
 encoded = ohe.fit_transform(df[nominal_cols])
 encoded_df = pd.DataFrame(encoded, columns=ohe.get_feature_names_out(nominal_cols))
 df = pd.concat([df.drop(columns=nominal_cols).reset_index(drop=True), encoded_df], axis=1)
-
-robust_scaler=RobustScaler()
-df[skewed_cols]=robust_scaler.fit_transform(df[skewed_cols])
 
 df['BsmtExposure']=OrdinalEncoder(categories=[['None','No','Mn','Av','Gd']]).fit_transform(df[['BsmtExposure']])
 for col in ['BsmtFinType1','BsmtFinType2']:
@@ -110,11 +112,18 @@ X=df.drop(columns=['SalePrice','SalePrice_log'])
 
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=20)
 
+defaults=X_train.median(numeric_only=True).to_dict()
+joblib.dump(defaults, 'defaults.pkl')
+
+robust_scaler = RobustScaler()
 X_train[skewed_cols]=robust_scaler.fit_transform(X_train[skewed_cols])
 X_test[skewed_cols]=robust_scaler.transform(X_test[skewed_cols])
 
 excluded_from_scaling=skewed_cols+ordinal_cols+nominal_cols+extra_ordinal+list(encoded_df.columns)
 remaining_numeric=[col for col in X_train.select_dtypes(include=[np.number]).columns if col not in excluded_from_scaling]
+
+joblib.dump(remaining_numeric, 'remaining_numeric.pkl')
+
 
 standard_scaler=StandardScaler()
 X_train[remaining_numeric]=standard_scaler.fit_transform(X_train[remaining_numeric])
@@ -173,5 +182,3 @@ joblib.dump(robust_scaler, 'robust_scaler.pkl')
 joblib.dump(standard_scaler, 'standard_scaler.pkl')
 joblib.dump(ohe, 'onehot_encoder.pkl')
 
-defaults=X_train.median(numeric_only=True).to_dict()
-joblib.dump(defaults, 'defaults.pkl')
