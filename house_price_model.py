@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 from sklearn.model_selection import train_test_split,cross_val_score,GridSearchCV
-from sklearn.preprocessing import StandardScaler,RobustScaler,OneHotEncoder,LabelEncoder
+from sklearn.preprocessing import StandardScaler,RobustScaler,OneHotEncoder,LabelEncoder,OrdinalEncoder
 from sklearn.impute import SimpleImputer
 from statsmodels.stats.outliers_influence import variance_inflation_factor
 from sklearn.compose import ColumnTransformer
@@ -19,33 +19,87 @@ import joblib
 
 df=pd.read_csv('ames_housing.csv')
 
-plt.scatter(df['GrLivArea'], df['SalePrice'])
-plt.title('Gr Liv Area vs SalePrice')
-plt.show()
-plt.scatter(df['OverallQual'], df['SalePrice'])
-plt.title('Overall Quality vs SalePrice')
-plt.show()
-plt.scatter(df['GarageCars'],df['GarageArea'])
-plt.title('Garage Cars vs Garage Area')
-plt.show()
+# plt.scatter(df['GrLivArea'], df['SalePrice'])
+# plt.title('Gr Liv Area vs SalePrice')
+# plt.show()
+# plt.scatter(df['OverallQual'], df['SalePrice'])
+# plt.title('Overall Quality vs SalePrice')
+# plt.show()
+# plt.scatter(df['GarageCars'],df['GarageArea'])
+# plt.title('Garage Cars vs Garage Area')
+# plt.show()
 
-plt.boxplot(data=df,x='neighborhood',y='SalePrice')
-plt.title('Sale Price by Neighborhood')
-plt.show()
-plt.boxplot(data=df,x='OverallQual',y='SalePrice')
-plt.title('Sale Price by Overall Quality')
-plt.show()
+# plt.boxplot(data=df,x='Neighborhood',y='SalePrice')
+# plt.title('Sale Price by Neighborhood')
+# plt.show()
+# plt.boxplot(data=df,x='OverallQual',y='SalePrice')
+# plt.title('Sale Price by Overall Quality')
+# plt.show()
 
-corr=df.select_dtypes(include=np.number).corr()['SalePrice'].sort_values(ascending=False)
-print(corr.head(15))
-print(corr.tail(15))
+# corr=df.select_dtypes(include=np.number).corr()['SalePrice'].sort_values(ascending=False)
+# print(corr.head(15))
+# print(corr.tail(15))
 
-top_features=df.select_dtypes(include=np.number).corr()['SalePrice'].abs().sort_values(ascending=False).head(15).index
-sns.heatmap(df[top_features].corr(),annot=True,cmap='coolwarm')
-plt.show()
+# top_features=df.select_dtypes(include=np.number).corr()['SalePrice'].abs().sort_values(ascending=False).head(15).index
+# sns.heatmap(df[top_features].corr(),annot=True,cmap='coolwarm')
+# plt.show()
 
-X=df[top_features].dropna()
-vif=pd.DataFrame()
-vif['Features']=X.columns
-vif['VIF']=[variance_inflation_factor(X.values, i) for i in range(X.shape[1])]
-print(vif.sort_values(by='VIF',ascending=False))
+# X=df[top_features].dropna()
+# vif=pd.DataFrame()
+# vif['Features']=X.columns
+# vif['VIF']=[variance_inflation_factor(X.values, i) for i in range(X.shape[1])]
+# print(vif.sort_values(by='VIF',ascending=False))
+
+#HANDLING MISSING VALUES AND OUTLIERS >>>>>
+
+df=df[df['GrLivArea']<4500].reset_index(drop=True)
+
+none_cols=['PoolQC','MiscFeature','Alley','Fence','FireplaceQu','GarageFinish',
+           'GarageQual','GarageCond','GarageType','BsmtExposure','BsmtFinType2',
+           'BsmtFinType1','BsmtCond','BsmtQual']
+for col in none_cols:
+    df[col]=df[col].fillna('None')
+
+
+df['LotFrontage']=df.groupby('Neighborhood')['LotFrontage'].transform(lambda x: x.fillna(x.median()))
+
+df['MasVnrType']=df['MasVnrType'].fillna('None')
+df['Electrical']=df['Electrical'].fillna(df['Electrical'].mode()[0])
+
+df['SalePrice_log']=np.log1p(df['SalePrice'])
+
+zero_heavy_cols=['PoolArea','3SsnPorch','LowQualFinSF','MiscVal','ScreenPorch','BsmtHalfBath','BsmtFinSF2','EnclosedPorch']
+for col in zero_heavy_cols:
+    df[f'has_{col}']=(df[col]>0).astype(int)
+
+#ENCODING >>>>>>>>
+
+ordinal_cols=['ExterQual','ExterCond','BsmtQual','BsmtCond','HeatingQC','KitchenQual','FireplaceQu',
+              'GarageQual','GarageCond','PoolQC']
+
+nominal_cols = ['MSZoning', 'Street', 'LotShape', 'LandContour', 'Utilities', 'LotConfig', 'LandSlope',
+                'Neighborhood', 'Condition1', 'Condition2', 'BldgType', 'HouseStyle', 'RoofStyle',
+                'RoofMatl', 'Exterior1st', 'Exterior2nd', 'MasVnrType', 'Foundation', 'Heating',
+                'CentralAir', 'Electrical', 'Functional', 'GarageType', 'PavedDrive',
+                'SaleType', 'SaleCondition', 'Alley', 'Fence', 'MiscFeature']
+
+skewed_cols = ['LotArea', 'LotFrontage', 'MasVnrArea', 'TotalBsmtSF', '1stFlrSF', 'GrLivArea']
+
+quality_order=['None','Po','Fa','TA','Gd','Ex']
+encoder=OrdinalEncoder(categories=[quality_order]*len(ordinal_cols))
+df[ordinal_cols]=encoder.fit_transform(df[ordinal_cols])
+
+ohe = OneHotEncoder(drop='first', sparse_output=False, handle_unknown='ignore')
+encoded = ohe.fit_transform(df[nominal_cols])
+encoded_df = pd.DataFrame(encoded, columns=ohe.get_feature_names_out(nominal_cols))
+df = pd.concat([df.drop(columns=nominal_cols).reset_index(drop=True), encoded_df], axis=1)
+
+robust_scaler=RobustScaler()
+df[skewed_cols]=robust_scaler.fit_transform(df[skewed_cols])
+
+df['BsmtExposure']=OrdinalEncoder(categories=[['None','No','Mn','Av','Gd']]).fit_transform(df[['BsmtExposure']])
+for col in ['BsmtFinType1','BsmtFinType2']:
+    df[col]=OrdinalEncoder(categories=[['None','Unf','LwQ','Rec','BLQ','ALQ','GLQ']]).fit_transform(df[[col]])
+df['GarageFinish']=OrdinalEncoder(categories=[['None','Unf','RFn','Fin']]).fit_transform(df[['GarageFinish']])
+
+
