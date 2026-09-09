@@ -131,12 +131,12 @@ rmse=np.sqrt(mean_squared_error(y_test,y_pred_lr))
 r2=r2_score(y_test,y_pred_lr)
 
 
-en=ElasticNet(alpha=0.01,l1_ratio=0.5,random_state=20)
-en.fit(X_train,y_train)
-y_pred_en=en.predict(X_test)
+final_model=ElasticNet(alpha=0.005,l1_ratio=0.01,random_state=20)
+final_model.fit(X_train,y_train)
+y_pred_final=final_model.predict(X_test)
 
-rmse_final=np.sqrt(mean_squared_error(y_test,y_pred_en))
-r2_final=r2_score(y_test,y_pred_en)
+rmse_final=np.sqrt(mean_squared_error(y_test,y_pred_final))
+r2_final=r2_score(y_test,y_pred_final)
 
 rf=RandomForestRegressor(n_estimators=300,max_depth=20,min_samples_leaf=2,min_samples_split=5,random_state=20)
 rf.fit(X_train,y_train)
@@ -165,3 +165,13 @@ print(f"{'Model':<25}{'RMSE':<10}{'R2':<10}")
 print(f"{'Linear Regression':<25}{rmse:<10.4f}{r2:<10.4f}")
 print(f"{'Random Forest (tuned)':<25}{rmse_best:<10.4f}{r2_best:<10.4f}")
 print(f"{'ElasticNet (final)':<25}{rmse_final:<10.4f}{r2_final:<10.4f}")
+
+# Saving the best model>>>>>>>>>>>>>>>
+
+joblib.dump(final_model, 'model.pkl')
+joblib.dump(robust_scaler, 'robust_scaler.pkl')
+joblib.dump(standard_scaler, 'standard_scaler.pkl')
+joblib.dump(ohe, 'onehot_encoder.pkl')
+
+defaults=X_train.median(numeric_only=True).to_dict()
+joblib.dump(defaults, 'defaults.pkl')
