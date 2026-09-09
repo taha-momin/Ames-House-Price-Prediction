@@ -62,7 +62,8 @@ for col in none_cols:
 
 
 df['LotFrontage']=df.groupby('Neighborhood')['LotFrontage'].transform(lambda x: x.fillna(x.median()))
-
+df['MasVnrArea']=df['MasVnrArea'].fillna(0)
+df['GarageYrBlt']=df['GarageYrBlt'].fillna(df['GarageYrBlt'].median())
 df['MasVnrType']=df['MasVnrType'].fillna('None')
 df['Electrical']=df['Electrical'].fillna(df['Electrical'].mode()[0])
 
@@ -84,6 +85,7 @@ nominal_cols = ['MSZoning', 'Street', 'LotShape', 'LandContour', 'Utilities', 'L
                 'SaleType', 'SaleCondition', 'Alley', 'Fence', 'MiscFeature']
 
 skewed_cols = ['LotArea', 'LotFrontage', 'MasVnrArea', 'TotalBsmtSF', '1stFlrSF', 'GrLivArea']
+extra_ordinal = ['BsmtExposure', 'BsmtFinType1', 'BsmtFinType2', 'GarageFinish']
 
 quality_order=['None','Po','Fa','TA','Gd','Ex']
 encoder=OrdinalEncoder(categories=[quality_order]*len(ordinal_cols))
@@ -103,3 +105,21 @@ for col in ['BsmtFinType1','BsmtFinType2']:
 df['GarageFinish']=OrdinalEncoder(categories=[['None','Unf','RFn','Fin']]).fit_transform(df[['GarageFinish']])
 
 
+y=df['SalePrice_log']
+X=df.drop(columns=['SalePrice','SalePrice_log'])
+
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=20)
+
+X_train[skewed_cols]=robust_scaler.fit_transform(X_train[skewed_cols])
+X_test[skewed_cols]=robust_scaler.transform(X_test[skewed_cols])
+
+excluded_from_scaling=skewed_cols+ordinal_cols+nominal_cols+extra_ordinal+list(encoded_df.columns)
+remaining_numeric=[col for col in X_train.select_dtypes(include=[np.number]).columns if col not in excluded_from_scaling]
+
+standard_scaler=StandardScaler()
+X_train[remaining_numeric]=standard_scaler.fit_transform(X_train[remaining_numeric])
+X_test[remaining_numeric]=standard_scaler.transform(X_test[remaining_numeric])
+
+print(X_train.shape,X_test.shape)
+print(X_train.select_dtypes('object').columns.tolist())
+print(X_train.isna().sum().sum(),X_test.isna().sum().sum())
